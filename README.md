@@ -1,0 +1,2 @@
+# tuirc
+TUI IRC client
