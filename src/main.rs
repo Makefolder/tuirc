@@ -5,16 +5,23 @@ use ratatui::{
         event::{self, Event, KeyCode, KeyEventKind},
         style::Color,
     },
-    layout::Alignment,
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Style, Stylize},
     text::{Line, Text},
     widgets::{Block, BorderType, Borders, Padding, Paragraph},
     DefaultTerminal, Frame,
 };
 
+#[derive(Default, Debug)]
+enum AppMode {
+    #[default]
+    Normal,
+    Insert,
+}
+
 #[derive(Debug, Default)]
 pub struct App {
-    counter: u8,
+    mode: AppMode,
     exit: bool,
 }
 
@@ -28,7 +35,12 @@ impl App {
     }
 
     fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self.make_chatw(), frame.area());
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Percentage(95), Constraint::Percentage(5)])
+            .split(frame.area());
+        frame.render_widget(self.make_chatw(), layout[0]);
+        frame.render_widget(self.make_inputf(), layout[1]);
     }
 
     fn handle_events(&mut self) -> Result<()> {
@@ -43,15 +55,15 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: event::KeyEvent) {
         match key_event.code {
-            KeyCode::Char('q') => self.exit = true,
-            KeyCode::Left => match self.counter.checked_sub(1) {
-                Some(n) => self.counter = n,
-                None => self.counter = 0,
+            KeyCode::Char('q') => match self.mode {
+                AppMode::Normal => self.exit = true,
+                _ => {}
             },
-            KeyCode::Right => match self.counter.checked_add(1) {
-                Some(n) => self.counter = n,
-                None => self.counter = 255,
+            KeyCode::Char('i') => match self.mode {
+                AppMode::Normal => self.mode = AppMode::Insert,
+                _ => {}
             },
+            KeyCode::Esc => self.mode = AppMode::Normal,
             _ => {}
         };
     }
@@ -61,25 +73,38 @@ impl App {
         let block = Block::new()
             // contents of main window
             .title_style(Style::new().white())
-            .title_top(" TUI IRC Client ")
+            .title_top("| TUI IRC Client |")
             .title_alignment(Alignment::Center)
             // Main window
             .style(Style::default().bg(Color::Black.into()))
-            .padding(Padding::symmetric(2, 1))
+            .padding(Padding::symmetric(1, 0))
             .borders(Borders::ALL)
-            .border_type(BorderType::Rounded);
+            .border_type(BorderType::Plain);
 
         // counter with the value
         let counter_text = Text::from(vec![Line::from(vec![
-            "Value: ".to_string().white(),
-            self.counter.to_string().white(),
+            "author:".to_string().bold(),
+            "their message.".to_string().white(),
         ])]);
         Paragraph::new(counter_text).block(block)
     }
 
     // Creates input field
-    fn make_inputf(&self) {
-        todo!()
+    fn make_inputf(&self) -> Paragraph {
+        let block = Block::new()
+            .style(Style::default().bg(Color::Black.into()))
+            .padding(Padding::symmetric(1, 0))
+            .borders(Borders::ALL)
+            .border_type(match self.mode {
+                AppMode::Insert => BorderType::Thick,
+                _ => BorderType::Plain,
+            });
+        let placeholder = match self.mode {
+            AppMode::Normal => "Enter your message...",
+            _ => "",
+        };
+        let inner_text = Text::from(placeholder).white().alignment(Alignment::Center);
+        Paragraph::new(inner_text).block(block)
     }
 }
 
